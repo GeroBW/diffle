@@ -27,6 +27,7 @@ gix = { version = "0.89", default-features = false, features = [
   "attributes",
   "index",
   "dirwalk",
+  "blob-diff",
 ] }
 hex = "0.4"
 indexmap = "2"

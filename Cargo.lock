@@ -1202,9 +1202,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa640963fdcbc6b4718e48593c3917f5ae764b59fb5a96313cb5a757246d041d"
 dependencies = [
  "bstr",
+ "gix-command",
  "gix-error",
+ "gix-filter",
+ "gix-fs",
  "gix-hash",
+ "gix-imara-diff",
  "gix-object",
+ "gix-path",
+ "gix-tempfile",
+ "gix-trace",
+ "gix-traverse",
+ "gix-worktree",
 ]
 
 [[package]]
@@ -1335,6 +1344,16 @@ dependencies = [
  "gix-path",
  "gix-trace",
  "unicode-bom",
+]
+
+[[package]]
+name = "gix-imara-diff"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c93ead32f1aded3f2ce985c3af4b4492f403a3f0d433250362eb845732d74893"
+dependencies = [
+ "bstr",
+ "hashbrown 0.16.1",
 ]
 
 [[package]]

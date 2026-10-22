@@ -1,18 +1,17 @@
 //! All Git access. Reads of objects, refs, the index and config go through gix in-process; diffs,
 //! searches, merges and the network still spawn git (`exec`), with cwd = the repository root.
-mod changes;
 mod commits;
+mod diff;
 pub mod exec;
 mod files;
 mod grep;
 mod index;
-mod patch;
 mod refs;
 mod walk;
 
 use std::path::{Path, PathBuf};
 
-pub use changes::is_binary;
+pub use diff::is_binary;
 pub use grep::{GrepMatch, GrepOptions, GrepResult};
 pub use refs::{Remote, Upstream};
 
@@ -25,8 +24,6 @@ const OBJECT_CACHE: usize = 16 * 1024 * 1024;
 /// Git's `core.bigFileThreshold` default: a file this large is diffed as binary without reading
 /// it, which also bounds what sizing an untracked file loads.
 pub const BIG_FILE_THRESHOLD: u64 = 512 * 1024 * 1024;
-/// Concurrent worktree reads while sizing or hashing files.
-const READ_CONCURRENCY: usize = 8;
 
 /// The uncommitted tree, accepted on either side of a comparison.
 pub const WORKTREE: &str = "worktree";
@@ -115,17 +112,6 @@ fn native_path(path: &Path) -> PathBuf {
         }
     }
     out
-}
-
-/// Git reverses the commit-to-worktree diff when the worktree is the old endpoint.
-fn diff_range<'a>(old: &'a str, new: &'a str) -> Vec<&'a str> {
-    if old == WORKTREE {
-        vec!["-R", new]
-    } else if new == WORKTREE {
-        vec![old]
-    } else {
-        vec![old, new]
-    }
 }
 
 /// `path` under `root`, or none when it would leave the repository.
