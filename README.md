@@ -20,6 +20,8 @@ comments to an agent as a prompt, or to GitHub as a pending review.
 ```bash
 pixi global install diffle               # conda-forge
 npm install -g @moritzwilksch/diffle     # npm
+cargo binstall diffle                    # crates.io, the release binary
+cargo install diffle                     # crates.io, compiled from source
 ```
 
 Or grab the standalone binary. On Linux (x64, arm64, glibc) and Apple silicon macOS:
@@ -213,7 +215,7 @@ pixi run diffle lsp                       # the language servers the environment
 
 The environment puts real language servers on PATH, so `pixi run diffle working` reviews with them.
 `pixi run lefthook-install` wires up the pre-commit hook (`.lefthook.yml`): it formats and lints the staged files, typechecks, and checks file-size and folder limits across the whole tree. `pixi run lefthook-run` runs the same hook over every file, as CI does.
-A debug build reads `dist/client` from disk: after a client change, run `npm run build`
+A debug build reads `crates/diffle/client` from disk: after a client change, run `npm run build`
 and reload the page. A release build (`cargo build --release`) embeds the client.
 `npm run fixture -- <dir>` builds the repository the tests review, covering renames, binaries,
 CRLF, and more. The browser suite drives Playwright's Linux Chromium in a Docker container

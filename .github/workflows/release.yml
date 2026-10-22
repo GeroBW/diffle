@@ -1,5 +1,6 @@
 name: Release
-# Keeps a `chore: release vX.Y.Z` pull request open that bumps the version and updates CHANGELOG.md
+# Keeps a `chore: release vX.Y.Z` pull request open that bumps the version (package.json and the
+# crate) and updates CHANGELOG.md
 # from the conventional commits since the last tag. Merging it tags the release; the tag runs Publish.
 on:
   push:
@@ -86,6 +87,8 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npm version --no-git-tag-version "${NEXT#v}"
+          sed -i "s/^version = \".*\"$/version = \"${NEXT#v}\"/" crates/diffle/Cargo.toml
+          cargo update --workspace
           git cliff --tag "$NEXT" -o CHANGELOG.md
           npx oxfmt CHANGELOG.md
           awk -v v="${NEXT#v}" '/^## \[/ { p = index($0, "## [" v "]") == 1; next } p' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
@@ -111,5 +114,7 @@ jobs:
           add-paths: |
             package.json
             package-lock.json
+            crates/diffle/Cargo.toml
+            Cargo.lock
             CHANGELOG.md
           sign-commits: true

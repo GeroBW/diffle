@@ -46,6 +46,7 @@ licenses = { cmd = "node scripts/licenses.ts", depends-on = ["build-client"] }
 smoke = { cmd = "node scripts/smoke-binary.ts target/release/diffle", depends-on = ["build-release"] }
 package = { cmd = "node scripts/package-binary.ts", depends-on = ["smoke"] }
 npm-packages = "node scripts/npm-packages.ts archives npm-packages --smoke"
+package-crate = { cmd = "node scripts/package-crate.ts", depends-on = ["build-client"] }
 
 [feature.lsp-web.dependencies]
 typescript-language-server = "*"

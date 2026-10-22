@@ -1,12 +1,29 @@
 [package]
 name = "diffle"
-# The release reads package.json; build.rs passes its version on as DIFFLE_VERSION.
-version = "0.0.0"
+# Kept equal to package.json's; the Release workflow bumps both and tests/version.rs checks them.
+version = "0.3.1"
 description = "Local git diff reviewer in the browser with line comments exported as agent prompts"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-publish = false
+repository = "https://github.com/moritzwilksch/diffle"
+homepage = "https://diffle.app"
+readme = "../../README.md"
+keywords = ["git", "diff", "code-review", "review"]
+categories = ["command-line-utilities", "development-tools"]
+# The client build and the licence files are git-ignored: scripts/package-crate.ts builds and copies them in.
+include = ["/src/**/*.rs", "/build.rs", "/protocol.generated.json", "/client/**", "/LICENSE", "/THIRD_PARTY_NOTICES.md"]
+
+# `cargo binstall diffle` downloads the release archive rather than compiling; other targets compile.
+[package.metadata.binstall]
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides]
+x86_64-unknown-linux-gnu = { pkg-url = "{ repo }/releases/download/v{ version }/diffle-linux-x64.tar.gz", pkg-fmt = "tgz" }
+aarch64-unknown-linux-gnu = { pkg-url = "{ repo }/releases/download/v{ version }/diffle-linux-arm64.tar.gz", pkg-fmt = "tgz" }
+aarch64-apple-darwin = { pkg-url = "{ repo }/releases/download/v{ version }/diffle-darwin-arm64.tar.gz", pkg-fmt = "tgz" }
+x86_64-pc-windows-msvc = { pkg-url = "{ repo }/releases/download/v{ version }/diffle-windows-x64.zip", pkg-fmt = "zip" }
+aarch64-pc-windows-msvc = { pkg-url = "{ repo }/releases/download/v{ version }/diffle-windows-arm64.zip", pkg-fmt = "zip" }
 
 [dependencies]
 anstream = "1"
