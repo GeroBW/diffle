@@ -26,18 +26,18 @@ http-body-util = "0.1"
 notify = "8"
 mime_guess = "2"
 regex = "1"
-regress = "0.10"
+regress = "0.12"
 reqwest = { version = "0.13.5", features = ["json"] }
 rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
-sha1 = "0.10"
-shlex = "1"
+sha1 = "0.11"
+shlex = "2"
 tempfile = "3"
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["compat"] }
-tower-http = { version = "0.6", features = ["compression-gzip", "compression-deflate"] }
+tower-http = { version = "0.7", features = ["compression-gzip", "compression-deflate"] }
 tower-service = "0.3"
 url = "2"
 uuid = { version = "1", features = ["v4"] }
@@ -53,9 +53,9 @@ tokio = { version = "1", features = ["full", "test-util"] }
 tokio-tungstenite = "0.30.0"
 
 [build-dependencies]
-prettyplease = "0.2"
+prettyplease = "0.3"
 schemars = "0.8"
 serde_json = "1"
-regress = "0.10"
-syn = "2"
+regress = "0.12"
+syn = "3"
 typify = "0.8"
