@@ -1,24 +1,13 @@
 //! What changed between two sides, and what git would store for the worktree's side.
 use std::collections::{HashMap, HashSet};
 
-use sha1::{Digest, Sha1};
-
-use super::exec::{ExecOptions, exec_git, split_z};
+use super::exec::{ExecOptions, split_z};
 use super::{BIG_FILE_THRESHOLD, GitRepo, READ_CONCURRENCY, WORKTREE, diff_range};
 use crate::concurrency::map_limit;
 use crate::error::{GitError, Result};
 use crate::protocol::{ChangeStatus, ChangedFile};
 
 impl GitRepo {
-    pub async fn ls_files(&self) -> Result<Vec<String>, GitError> {
-        Ok(split_z(&self.exec(&["ls-files", "-z"], ExecOptions::default()).await?))
-    }
-
-    /// Every path in a commit's tree.
-    pub async fn ls_tree(&self, rev: &str) -> Result<Vec<String>, GitError> {
-        Ok(split_z(&self.exec(&["ls-tree", "-r", "-z", "--name-only", rev], ExecOptions::default()).await?))
-    }
-
     pub async fn untracked(&self) -> Result<Vec<String>, GitError> {
         Ok(split_z(&self.exec(&["ls-files", "-z", "--others", "--exclude-standard"], ExecOptions::default()).await?))
     }
@@ -27,44 +16,6 @@ impl GitRepo {
     pub async fn ignored_paths(&self) -> Result<Vec<String>, GitError> {
         let args = ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"];
         Ok(split_z(&self.exec(&args, ExecOptions::default()).await?))
-    }
-
-    /// Paths git ignores, from a candidate list.
-    pub async fn ignored(&self, paths: &[String]) -> Result<HashSet<String>, GitError> {
-        if paths.is_empty() {
-            return Ok(HashSet::new());
-        }
-        let input = paths.join("\0");
-        let opts = ExecOptions { input: Some(input.as_bytes()), ok_codes: &[0, 1], ..Default::default() };
-        Ok(split_z(&self.exec(&["check-ignore", "-z", "--stdin"], opts).await?).into_iter().collect())
-    }
-
-    /// Boolean value of a gitattribute per path: `attr` or `attr=true` reads true, `-attr` or
-    /// `attr=false` false; unspecified paths are absent. A revision reads `.gitattributes` from
-    /// that tree, the worktree from the checkout. `--source` needs git 2.40.
-    pub async fn attr(&self, name: &str, paths: &[String], rev: &str) -> Result<HashMap<String, bool>, GitError> {
-        let mut out = HashMap::new();
-        if paths.is_empty() {
-            return Ok(out);
-        }
-        let source = format!("--source={rev}");
-        let mut args = vec!["check-attr", "-z", "--stdin"];
-        if rev != WORKTREE {
-            args.push(&source);
-        }
-        args.extend([name, "--"]);
-        let input = paths.join("\0");
-        let fields =
-            split_z(&self.exec(&args, ExecOptions { input: Some(input.as_bytes()), ..Default::default() }).await?);
-        // Records are `path NUL attr NUL value NUL`.
-        for record in fields.as_chunks::<3>().0 {
-            match record[2].as_str() {
-                "set" | "true" => out.insert(record[0].clone(), true),
-                "unset" | "false" => out.insert(record[0].clone(), false),
-                _ => None,
-            };
-        }
-        Ok(out)
     }
 
     /// Changed files between two revs, or a rev and the worktree (untracked files included). One
@@ -128,85 +79,6 @@ impl GitRepo {
         }
         file
     }
-
-    /// What git would store for each worktree entry, in order: the file's blob, a symlink's target
-    /// blob, a submodule's checked-out commit. Regular files go to one `hash-object --stdin-paths`
-    /// call; everything else is hashed on its own, so a gitlink, a broken link or an unreadable
-    /// path never fails the batch. A path that cannot be hashed gets an empty blob.
-    async fn hash_worktree(&self, files: &[(String, bool)]) -> Vec<String> {
-        let kinds = map_limit(0..files.len(), READ_CONCURRENCY, |i| async move {
-            let (path, submodule) = &files[i];
-            if *submodule {
-                return Hashed::Done(self.submodule_head(path).await);
-            }
-            let abs = self.root.join(path);
-            match tokio::fs::symlink_metadata(&abs).await {
-                Ok(m) if m.is_symlink() => match tokio::fs::read_link(&abs).await {
-                    Ok(target) => Hashed::Done(blob_sha(target.to_string_lossy().as_bytes())),
-                    Err(_) => Hashed::Done(String::new()),
-                },
-                Ok(m) if m.is_file() => Hashed::Regular,
-                _ => Hashed::Done(String::new()),
-            }
-        })
-        .await;
-        let mut shas: Vec<String> = Vec::with_capacity(files.len());
-        let mut regular = Vec::new();
-        for (i, kind) in kinds.into_iter().enumerate() {
-            shas.push(match kind {
-                Hashed::Done(sha) => sha,
-                Hashed::Regular => {
-                    regular.push(i);
-                    String::new()
-                }
-            });
-        }
-        // A path containing a newline cannot ride the stdin list.
-        let (mut single, batch): (Vec<usize>, Vec<usize>) =
-            regular.into_iter().partition(|&i| files[i].0.contains('\n'));
-        if !batch.is_empty() {
-            let input: String = batch.iter().map(|&i| format!("{}\n", files[i].0)).collect();
-            let opts = ExecOptions { input: Some(input.as_bytes()), ..Default::default() };
-            match self.text_with(&["hash-object", "--stdin-paths"], opts).await {
-                Ok(out) => {
-                    for (i, line) in batch.iter().zip(out.trim().lines()) {
-                        shas[*i] = line.to_owned();
-                    }
-                }
-                // One unreadable path (permissions, vanished mid-refresh) aborts git's whole batch; retry each alone.
-                Err(_) => single.extend(batch),
-            }
-        }
-        let hashed = map_limit(single.clone(), READ_CONCURRENCY, |i| async move {
-            self.text(&["hash-object", "--", &files[i].0]).await.map(|s| s.trim().to_owned()).unwrap_or_default()
-        })
-        .await;
-        for (i, sha) in single.into_iter().zip(hashed) {
-            shas[i] = sha;
-        }
-        shas
-    }
-
-    /// What git would store for `content` at worktree `path`, its clean filters applied: equals the
-    /// snapshot's blob for a worktree file whose bytes are still the snapshot's.
-    pub async fn hash_object(&self, content: &[u8], path: &str) -> Result<String, GitError> {
-        let path = format!("--path={path}");
-        let opts = ExecOptions { input: Some(content), ..Default::default() };
-        Ok(self.text_with(&["hash-object", "--stdin", &path], opts).await?.trim().to_owned())
-    }
-
-    /// The commit a checked-out submodule is at, or '' if it is not a repository.
-    async fn submodule_head(&self, path: &str) -> String {
-        exec_git(&self.root.join(path), &["rev-parse", "--verify", "--quiet", "HEAD"], ExecOptions::default())
-            .await
-            .map(|out| String::from_utf8_lossy(&out).trim().to_owned())
-            .unwrap_or_default()
-    }
-}
-
-enum Hashed {
-    Done(String),
-    Regular,
 }
 
 fn is_submodule(file: &ChangedFile) -> bool {
@@ -291,14 +163,6 @@ fn parse_raw_numstat(buf: &[u8]) -> Vec<ChangedFile> {
         }
     }
     files
-}
-
-/// The sha git gives a blob with these contents; what `hash-object --stdin` prints.
-fn blob_sha(content: &[u8]) -> String {
-    let mut hasher = Sha1::new();
-    hasher.update(format!("blob {}\0", content.len()));
-    hasher.update(content);
-    hex::encode(hasher.finalize())
 }
 
 pub fn is_binary(buf: &[u8]) -> bool {

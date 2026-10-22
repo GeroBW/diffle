@@ -155,9 +155,4 @@ impl GitRepo {
         }
         Ok(out)
     }
-
-    async fn is_tracked(&self, path: &str) -> Result<bool, GitError> {
-        let opts = ExecOptions { ok_codes: &[0, 1], ..Default::default() };
-        Ok(!self.exec(&["ls-files", "-z", "--error-unmatch", "--", path], opts).await?.is_empty())
-    }
 }
