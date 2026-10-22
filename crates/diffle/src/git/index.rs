@@ -6,15 +6,39 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 use gix::attrs::StateRef;
-use gix::bstr::ByteSlice;
+use gix::bstr::{BStr, ByteSlice};
+use gix::dir::entry::{Kind, Status};
+use gix::dir::walk::EmissionMode;
+use gix::dir::walk::delegate::Collect;
 use gix::filter::plumbing::pipeline::convert::ToGitOutcome;
-use gix::objs::Kind;
 use gix::worktree::stack::state::attributes::Source;
 
 use super::{GitRepo, WORKTREE};
 use crate::error::GitError;
 
 impl GitRepo {
+    /// Untracked files git does not ignore, sorted; a nested repository is `dir/`, as git has no
+    /// diff for it.
+    pub async fn untracked(&self) -> Result<Vec<String>, GitError> {
+        self.gix("listing untracked files", |repo| {
+            let options = repo.dirwalk_options()?.emit_untracked(EmissionMode::Matching).emit_ignored(None);
+            walk(repo, options, |status| status == Status::Untracked)
+        })
+        .await
+    }
+
+    /// Ignored files and directories (directories end with '/'), sorted. Feeds the watcher.
+    pub async fn ignored_paths(&self) -> Result<Vec<String>, GitError> {
+        self.gix("listing ignored files", |repo| {
+            let options = repo
+                .dirwalk_options()?
+                .emit_untracked(EmissionMode::Matching)
+                .emit_ignored(Some(EmissionMode::CollapseDirectory));
+            walk(repo, options, |status| matches!(status, Status::Ignored(_)))
+        })
+        .await
+    }
+
     /// Every path in the index, once.
     pub async fn ls_files(&self) -> Result<Vec<String>, GitError> {
         self.gix("ls-files", |repo| {
@@ -136,6 +160,31 @@ impl GitRepo {
     }
 }
 
+/// The worktree entries `keep` selects, as repository-relative paths with a directory's ending in '/'.
+fn walk(
+    repo: &gix::Repository,
+    options: gix::dirwalk::Options,
+    keep: impl Fn(Status) -> bool,
+) -> anyhow::Result<Vec<String>> {
+    let index = repo.index_or_empty()?;
+    let options = options.emit_tracked(false).recurse_repositories(false).emit_empty_directories(false);
+    let mut collect = Collect::default();
+    let none: [&BStr; 0] = [];
+    repo.dirwalk(&index, none, &AtomicBool::new(false), options, &mut collect)?;
+    let mut paths: Vec<String> = collect
+        .unorded_entries
+        .into_iter()
+        .filter(|(entry, _)| keep(entry.status))
+        .filter_map(|(entry, _)| match entry.disk_kind? {
+            Kind::File | Kind::Symlink => Some(entry.rela_path.to_string()),
+            Kind::Directory | Kind::Repository => Some(format!("{}/", entry.rela_path)),
+            Kind::Untrackable => None,
+        })
+        .collect();
+    paths.sort();
+    Ok(paths)
+}
+
 /// The blob git stores for `src` (`len` bytes) at `path`: line endings, `ident`, encodings and
 /// filter drivers applied. Unfiltered content streams through the hasher, so a large file is never held.
 fn hash_to_git(
@@ -150,7 +199,7 @@ fn hash_to_git(
         ToGitOutcome::Unchanged(mut src) => {
             let interrupt = AtomicBool::new(false);
             let (kind, progress) = (repo.object_hash(), &mut gix::progress::Discard);
-            gix::objs::compute_stream_hash(kind, Kind::Blob, &mut src, len, progress, &interrupt)?
+            gix::objs::compute_stream_hash(kind, gix::objs::Kind::Blob, &mut src, len, progress, &interrupt)?
         }
         ToGitOutcome::Process(mut src) => {
             let mut buf = Vec::new();
@@ -163,7 +212,7 @@ fn hash_to_git(
 }
 
 fn blob_sha(repo: &gix::Repository, content: &[u8]) -> gix::Result<gix::ObjectId> {
-    gix::objs::compute_hash(repo.object_hash(), Kind::Blob, content)
+    gix::objs::compute_hash(repo.object_hash(), gix::objs::Kind::Blob, content)
 }
 
 /// The commit a checked-out submodule is at; none when it is not a repository of its own.

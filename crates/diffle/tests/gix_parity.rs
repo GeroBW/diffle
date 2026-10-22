@@ -207,3 +207,40 @@ async fn hashes_content_and_reads_attributes_as_git_does() {
     let worktree = repo.attr("linguist-generated", &paths, "worktree").await.unwrap();
     assert_eq!(worktree, HashMap::from([("keep.py".to_owned(), true), ("b.py".to_owned(), true)]));
 }
+
+#[tokio::test]
+async fn lists_untracked_and_ignored_paths_as_ls_files_others_does() {
+    let t = TestRepo::new();
+    t.write(".gitignore", "target/\n*.log\n!keep.log\nbuild\n");
+    t.write("tracked.log", "tracked though ignored\n");
+    t.git(&["add", "-f", "tracked.log"]);
+    t.write("a.txt", "a\n");
+    t.commit("base");
+    t.write("new.txt", "n\n");
+    t.write("dir/deep/new.rs", "n\n");
+    t.write("dir/debug.log", "x\n");
+    t.write("dir/keep.log", "k\n");
+    t.write("target/out/bin", "x\n");
+    t.write("build", "a file named like an ignored directory\n");
+    std::fs::create_dir_all(t.path.join("empty/inner")).unwrap();
+    common::git_in(
+        &{
+            let nested = t.path.join("nested");
+            std::fs::create_dir_all(&nested).unwrap();
+            nested
+        },
+        &["init", "-q"],
+    );
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("a.txt", t.path.join("link")).unwrap();
+    let repo = t.open().await;
+    let lines = |args: &[&str]| -> Vec<String> {
+        let mut all = vec!["ls-files", "-z", "--others", "--exclude-standard"];
+        all.extend(args);
+        let mut out: Vec<String> = t.git(&all).split('\0').filter(|p| !p.is_empty()).map(str::to_owned).collect();
+        out.sort();
+        out
+    };
+    assert_eq!(repo.untracked().await.unwrap(), lines(&[]));
+    assert_eq!(repo.ignored_paths().await.unwrap(), lines(&["--ignored", "--directory"]));
+}

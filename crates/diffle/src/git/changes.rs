@@ -4,20 +4,10 @@ use std::collections::{HashMap, HashSet};
 use super::exec::{ExecOptions, split_z};
 use super::{BIG_FILE_THRESHOLD, GitRepo, READ_CONCURRENCY, WORKTREE, diff_range};
 use crate::concurrency::map_limit;
-use crate::error::{GitError, Result};
+use crate::error::Result;
 use crate::protocol::{ChangeStatus, ChangedFile};
 
 impl GitRepo {
-    pub async fn untracked(&self) -> Result<Vec<String>, GitError> {
-        Ok(split_z(&self.exec(&["ls-files", "-z", "--others", "--exclude-standard"], ExecOptions::default()).await?))
-    }
-
-    /// Ignored files and directories (directories end with '/'). Feeds the watcher.
-    pub async fn ignored_paths(&self) -> Result<Vec<String>, GitError> {
-        let args = ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"];
-        Ok(split_z(&self.exec(&args, ExecOptions::default()).await?))
-    }
-
     /// Changed files between two revs, or a rev and the worktree (untracked files included). One
     /// diff call yields status, line counts and, against a commit, each side's blob; the
     /// worktree's blobs are hashed from disk.

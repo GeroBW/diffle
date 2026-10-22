@@ -26,6 +26,7 @@ gix = { version = "0.89", default-features = false, features = [
   "revparse-regex",
   "attributes",
   "index",
+  "dirwalk",
 ] }
 hex = "0.4"
 indexmap = "2"
