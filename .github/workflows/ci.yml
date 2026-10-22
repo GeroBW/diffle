@@ -25,8 +25,26 @@ jobs:
       - name: Smoke test Nix package
         run: nix run . -- --help
 
+  pixi-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
+        with:
+          run-install: false
+      - run: pixi publish --target-dir output
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pixi-build-package
+          path: output/**/*.conda
+          if-no-files-found: error
+
   test:
     runs-on: ${{ matrix.os }}
+    # A hung test fails here instead of at GitHub's six-hour limit.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -49,6 +67,7 @@ jobs:
 
   rust:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +93,7 @@ jobs:
   # here as on every developer machine: the screenshots are the container's.
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
