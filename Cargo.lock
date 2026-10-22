@@ -578,7 +578,7 @@ dependencies = [
  "tokio-tungstenite 0.30.0",
  "tokio-util",
  "tower-http 0.7.1",
- "tower-service",
+ "tower-layer",
  "typify",
  "url",
  "uuid",
