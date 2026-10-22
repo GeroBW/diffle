@@ -156,3 +156,7 @@ snapshot-report.html
 
 # pixi
 .pixi/
+
+# cargo-mutants
+mutants.out/
+mutants.out.old/

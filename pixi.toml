@@ -63,5 +63,17 @@ clang-tools = "*"
 tombi = "*"
 bash-language-server = "*"
 
+# conda-forge builds cargo-mutants for every platform but win-arm64.
+[feature.mutants]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "osx-64", "win-64"]
+
+[feature.mutants.dependencies]
+cargo-mutants = ">=27"
+
+[feature.mutants.tasks]
+# Mutates the server and reports each mutant the Rust tests let through; see .cargo/mutants.toml.
+mutants = "cargo mutants"
+
 [environments]
 default = ["lsp-web", "lsp-rust", "lsp-python", "lsp-more"]
+mutants = { features = ["mutants"], no-default-feature = false }
