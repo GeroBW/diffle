@@ -46,7 +46,7 @@
               cp -r crates/diffle/client "$out"
             '';
           };
-          # The Cargo sources plus the wire contract build.rs turns into Rust.
+          # The Cargo sources plus what build.rs reads: the wire contract it turns into Rust.
           src = lib.fileset.toSource {
             root = ./.;
             fileset = lib.fileset.unions [
