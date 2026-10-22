@@ -3870,7 +3870,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 The binary links the crates below, grouped by licence. Each licence's text follows the crates
 that use it.
 
-- MIT License: 300
+- MIT License: 302
 - Unicode License v3: 20
 - Apache License 2.0: 7
 - ISC License: 6
@@ -5914,6 +5914,7 @@ THE SOFTWARE.
 ### MIT License
 
 Used by:
+- sha1 0.11.0 (https://github.com/RustCrypto/hashes)
 - sha2 0.11.1 (https://github.com/RustCrypto/hashes)
 
 ```
@@ -7049,6 +7050,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 - tower-http 0.6.11 (https://github.com/tower-rs/tower-http)
+- tower-http 0.7.1 (https://github.com/tower-rs/tower-http)
 
 ```
 Copyright (c) 2019-2021 Tower Contributors
@@ -7920,7 +7922,7 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 Used by:
-- regress 0.10.5 (https://github.com/ridiculousfish/regress)
+- regress 0.12.0 (https://github.com/ridiculousfish/regress)
 
 ```
 MIT License
@@ -8611,7 +8613,7 @@ THE SOFTWARE.
 ### MIT License
 
 Used by:
-- shlex 1.3.0 (https://github.com/comex/rust-shlex)
+- shlex 2.0.1 (https://github.com/comex/rust-shlex)
 
 ```
 The MIT License (MIT)
