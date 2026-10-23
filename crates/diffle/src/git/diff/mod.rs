@@ -8,6 +8,7 @@ mod rename;
 mod series;
 pub mod sides;
 mod unified;
+mod worktree;
 
 use gix::ObjectId;
 use gix::bstr::{BString, ByteSlice};
@@ -45,8 +46,8 @@ impl GitRepo {
                     if rev != WORKTREE {
                         return Ok((sides::tree_items(repo, tree_id(repo, rev)?)?, Vec::new()));
                     }
-                    let (mut items, conflicts) = sides::worktree_items(repo, &root)?;
-                    items.extend(sides::untracked_items(repo, &root, &untracked)?);
+                    let (mut items, conflicts) = worktree::worktree_items(repo, &root)?;
+                    items.extend(worktree::untracked_items(repo, &root, &untracked)?);
                     items.sort_by(|a, b| a.path.cmp(&b.path));
                     Ok((items, conflicts))
                 };
