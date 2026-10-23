@@ -110,12 +110,14 @@ export async function newVideoPage(
  */
 export async function saveVideo(
   context: BrowserContext,
-  video: { path(): Promise<string> },
+  video: { saveAs(path: string): Promise<void> },
   webmPath: string,
 ): Promise<string> {
-  const recorded = await video.path();
   await context.close();
   await mkdir(dirname(webmPath), { recursive: true });
+  // The browser runs in a container, so the recording is copied out rather than read in place.
+  const recorded = `${webmPath}.vp8.webm`;
+  await video.saveAs(recorded);
   quiet('ffmpeg', [
     '-y',
     '-v',
