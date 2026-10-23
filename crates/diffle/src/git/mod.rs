@@ -1,12 +1,11 @@
-//! All Git access. Reads of objects, refs, the index and config go through gix in-process; diffs,
-//! searches, merges and the network still spawn git (`exec`), with cwd = the repository root.
+//! All Git access, in-process through gix: no git executable is spawned.
 mod commits;
 mod diff;
-pub mod exec;
 mod files;
 mod grep;
 mod index;
 mod refs;
+mod remote;
 mod walk;
 
 use std::path::{Path, PathBuf};
@@ -16,7 +15,6 @@ pub use grep::{GrepMatch, GrepOptions, GrepResult};
 pub use refs::{Remote, Upstream};
 
 use crate::error::{GitError, Result};
-use exec::{ExecOptions, exec_git};
 
 /// Objects a thread-local handle keeps decoded, so walks and repeated lookups skip re-inflating.
 const OBJECT_CACHE: usize = 16 * 1024 * 1024;
@@ -60,13 +58,6 @@ impl GitRepo {
         Ok(Self { review_refs: format!("refs/diffle/{}", uuid::Uuid::new_v4()), root, git_dir, common_dir, repo })
     }
 
-    /// Clone into an empty directory; full history preserves merge bases.
-    pub async fn clone_into(url: &str, dir: &Path) -> Result<Self> {
-        let opts = ExecOptions { env: &[("GIT_TERMINAL_PROMPT", "0")], ..Default::default() };
-        exec_git(dir, &["clone", "--quiet", "--no-tags", "--", url, "."], opts).await?;
-        Self::open(dir).await
-    }
-
     /// Runs `f` on a thread-local gix handle off the async runtime, as gix blocks. `op` names the
     /// failure in the error.
     async fn gix<T, F>(&self, op: &str, f: F) -> Result<T, GitError>
@@ -84,10 +75,6 @@ impl GitRepo {
         .await
         .map_err(|e| failed(&e))?
         .map_err(|e| failed(&e))
-    }
-
-    async fn exec(&self, args: &[&str], opts: ExecOptions<'_>) -> Result<Vec<u8>, GitError> {
-        exec_git(&self.root, args, opts).await
     }
 }
 

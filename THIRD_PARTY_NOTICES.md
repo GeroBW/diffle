@@ -4178,9 +4178,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 The binary links the crates below, grouped by licence. Each licence's text follows the crates
 that use it.
 
-- MIT License: 321
+- MIT License: 335
 - Unicode License v3: 20
-- Apache License 2.0: 7
+- Apache License 2.0: 8
 - ISC License: 6
 - BSD 3-Clause "New" or "Revised" License: 5
 - Mozilla Public License 2.0: 2
@@ -4192,6 +4192,7 @@ that use it.
 
 Used by:
 - gethostname 1.1.0 (https://codeberg.org/swsnr/gethostname.rs.git)
+- gix-imara-diff 0.3.2 (https://github.com/GitoxideLabs/gitoxide)
 
 ```
                               Apache License
@@ -5782,6 +5783,34 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
+- winapi 0.3.9 (https://github.com/retep998/winapi-rs)
+
+```
+Copyright (c) 2015-2018 The winapi-rs Developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ```
 
@@ -8519,6 +8548,7 @@ SOFTWARE.
 
 Used by:
 - chrono 0.4.45 (https://github.com/chronotope/chrono)
+- dua-core 4.2.0 (https://github.com/Byron/dua-cli)
 - http-serde 2.1.1 (https://gitlab.com/kornelski/http-serde)
 - jni-macros 0.22.4 (https://github.com/jni-rs/jni-rs)
 - jni-sys-macros 0.4.1 (https://github.com/jni-rs/jni-sys)
@@ -8526,6 +8556,8 @@ Used by:
 - r-efi 5.3.0 (https://github.com/r-efi/r-efi)
 - r-efi 6.0.0 (https://github.com/r-efi/r-efi)
 - rustls-platform-verifier-android 0.2.0 (https://github.com/rustls/rustls-platform-verifier)
+- winapi-i686-pc-windows-gnu 0.4.0 (https://github.com/retep998/winapi-rs)
+- winapi-x86_64-pc-windows-gnu 0.4.0 (https://github.com/retep998/winapi-rs)
 - windows-core 0.62.2 (https://github.com/microsoft/windows-rs)
 - windows-implement 0.60.2 (https://github.com/microsoft/windows-rs)
 - windows-interface 0.59.3 (https://github.com/microsoft/windows-rs)
@@ -8698,6 +8730,40 @@ SOFTWARE.
 ### MIT License
 
 Used by:
+- io-close 0.3.7 (https://gitlab.com/wufz/io-close)
+
+```
+MIT License
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+```
+
+### MIT License
+
+Used by:
 - simdutf8 0.1.5 (https://github.com/rusticstuff/simdutf8)
 
 ```
@@ -8858,8 +8924,10 @@ Used by:
 - gix-commitgraph 0.41.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-config-value 0.21.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-config 0.62.1 (https://github.com/GitoxideLabs/gitoxide)
+- gix-credentials 0.42.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-date 0.18.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-diff 0.69.0 (https://github.com/GitoxideLabs/gitoxide)
+- gix-dir 0.31.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-discover 0.57.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-error 0.5.2 (https://github.com/GitoxideLabs/gitoxide)
 - gix-filter 0.36.1 (https://github.com/GitoxideLabs/gitoxide)
@@ -8871,6 +8939,8 @@ Used by:
 - gix-index 0.57.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-lock 26.0.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-macros 0.2.0 (https://github.com/GitoxideLabs/gitoxide)
+- gix-merge 0.22.0 (https://github.com/GitoxideLabs/gitoxide)
+- gix-negotiate 0.37.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-object 0.66.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-odb 0.86.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-pack 0.76.0 (https://github.com/GitoxideLabs/gitoxide)
@@ -8878,6 +8948,7 @@ Used by:
 - gix-parallel 0.50.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-path 0.14.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-pathspec 0.22.1 (https://github.com/GitoxideLabs/gitoxide)
+- gix-prompt 0.19.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-protocol 0.67.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-quote 0.10.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-ref 0.69.1 (https://github.com/GitoxideLabs/gitoxide)
@@ -8886,6 +8957,7 @@ Used by:
 - gix-revwalk 0.37.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-sec 0.16.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-shallow 0.15.1 (https://github.com/GitoxideLabs/gitoxide)
+- gix-status 0.36.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-submodule 0.36.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-tempfile 26.0.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-trace 0.3.1 (https://github.com/GitoxideLabs/gitoxide)
@@ -8894,6 +8966,7 @@ Used by:
 - gix-url 0.40.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-utils 0.5.1 (https://github.com/GitoxideLabs/gitoxide)
 - gix-validate 0.13.1 (https://github.com/GitoxideLabs/gitoxide)
+- gix-worktree-state 0.36.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-worktree 0.58.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix-zlib 0.3.0 (https://github.com/GitoxideLabs/gitoxide)
 - gix 0.89.0 (https://github.com/GitoxideLabs/gitoxide)
@@ -9498,7 +9571,9 @@ Used by:
 - crossbeam-channel 0.5.17 (https://github.com/crossbeam-rs/crossbeam)
 - crossbeam-deque 0.8.8 (https://github.com/crossbeam-rs/crossbeam)
 - crossbeam-epoch 0.9.21 (https://github.com/crossbeam-rs/crossbeam)
+- crossbeam-queue 0.3.14 (https://github.com/crossbeam-rs/crossbeam)
 - crossbeam-utils 0.8.23 (https://github.com/crossbeam-rs/crossbeam)
+- crossbeam 0.8.5 (https://github.com/crossbeam-rs/crossbeam)
 
 ```
 The MIT License (MIT)

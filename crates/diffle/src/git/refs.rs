@@ -8,7 +8,6 @@ use gix::refs::transaction::{PreviousValue, RefEdit};
 use gix::revision::walk::Sorting;
 use gix::traverse::commit::simple::CommitTimeOrder;
 
-use super::exec::ExecOptions;
 use super::{GitRepo, WORKTREE};
 use crate::error::{GitError, Result};
 use crate::protocol::{RefsResponse, RefsResponseRecentItem};
@@ -141,22 +140,6 @@ impl GitRepo {
         .await
     }
 
-    /// Fetches explicit refspecs from `remote` (a name or a URL). The refspecs must stay inside
-    /// `refs/diffle/`, so no ref the user owns moves, and FETCH_HEAD is left alone. Terminal prompts
-    /// are off: a repository that needs credentials fails instead of hanging.
-    pub async fn fetch(&self, remote: &str, refspecs: &[String]) -> Result<(), GitError> {
-        for spec in refspecs {
-            let dst = spec.split_once(':').map_or(spec.as_str(), |(_, dst)| dst);
-            if !dst.starts_with("refs/diffle/") {
-                return Err(GitError::refused(format!("refusing to fetch into {dst}"), &["fetch"]));
-            }
-        }
-        let mut args = vec!["fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--end-of-options", remote];
-        args.extend(refspecs.iter().map(String::as_str));
-        self.exec(&args, ExecOptions { env: &[("GIT_TERMINAL_PROMPT", "0")], ..Default::default() }).await?;
-        Ok(())
-    }
-
     /// Branches, tags, and recent commits for the mode picker.
     pub async fn refs(&self) -> Result<RefsResponse> {
         let listed = self.gix("listing refs", |repo| {
@@ -178,7 +161,7 @@ impl GitRepo {
 }
 
 /// Config as it is on disk now: the shared handle keeps what was read when the repository opened.
-fn current_config(repo: &gix::Repository) -> gix::Result<gix::Repository> {
+pub(super) fn current_config(repo: &gix::Repository) -> gix::Result<gix::Repository> {
     gix::open(repo.workdir().unwrap_or(repo.git_dir()))
 }
 

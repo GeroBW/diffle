@@ -386,3 +386,25 @@ async fn searches_a_real_repository_as_git_grep_does() {
         }
     }
 }
+
+/// Over the network: a pull request ref fetched from GitHub, and a clone over https.
+/// `DIFFLE_PARITY_REPO=<a clone of github.com/BurntSushi/ripgrep> cargo test -- --ignored network`.
+#[tokio::test]
+#[ignore]
+async fn fetches_and_clones_over_https() {
+    let dir = std::path::PathBuf::from(std::env::var("DIFFLE_PARITY_REPO").expect("DIFFLE_PARITY_REPO"));
+    let repo = diffle::git::GitRepo::open(&dir).await.unwrap();
+    let dst = format!("{}/pr/100/head", repo.review_refs);
+    repo.fetch("origin", &[format!("+refs/pull/100/head:{dst}")]).await.unwrap();
+    assert_eq!(
+        repo.resolve(&dst).await.unwrap(),
+        common::git_in(&dir, &["ls-remote", "origin", "refs/pull/100/head"]).split('\t').next().unwrap()
+    );
+    repo.clean_review_refs().await.unwrap();
+    let target = tempfile::tempdir().unwrap();
+    let clone =
+        diffle::git::GitRepo::clone_into("https://github.com/octocat/Hello-World", target.path()).await.unwrap();
+    assert_eq!(clone.resolve("HEAD").await.unwrap(), common::git_in(target.path(), &["rev-parse", "origin/master"]));
+    assert_eq!(common::git_in(target.path(), &["status", "--porcelain"]), "");
+    assert!(target.path().join("README").exists());
+}
