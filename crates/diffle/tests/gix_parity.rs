@@ -244,3 +244,57 @@ async fn lists_untracked_and_ignored_paths_as_ls_files_others_does() {
     assert_eq!(repo.untracked().await.unwrap(), lines(&[]));
     assert_eq!(repo.ignored_paths().await.unwrap(), lines(&["--ignored", "--directory"]));
 }
+
+/// `git merge-tree --write-tree --name-only`: the tree, and the conflicted paths.
+fn git_merge_tree(t: &TestRepo, base: &str, onto: &str, head: &str) -> (String, Vec<String>) {
+    let out = Command::new("git")
+        .args(["merge-tree", "--write-tree", "-z", "--name-only", &format!("--merge-base={base}"), onto, head])
+        .current_dir(&t.path)
+        .output()
+        .unwrap();
+    let out = String::from_utf8(out.stdout).unwrap();
+    let mut parts = out.split('\0');
+    let tree = parts.next().unwrap().to_owned();
+    (tree, parts.take_while(|p| !p.is_empty()).map(str::to_owned).collect())
+}
+
+#[tokio::test]
+async fn replays_as_git_merge_tree_does_conflicts_included() {
+    let t = TestRepo::new();
+    let lines = |tag: &str| (0..40).map(|i| format!("{tag} line {i}\n")).collect::<String>();
+    t.write("edit.txt", lines("edit"));
+    t.write("moved.txt", lines("moved"));
+    t.write("gone.txt", lines("gone"));
+    t.write("bin.dat", b"\x00base");
+    t.write("same.txt", lines("same"));
+    t.commit("base");
+    t.git(&["checkout", "-q", "-b", "head"]);
+    t.write(
+        "edit.txt",
+        lines("edit").replace("edit line 5\n", "head five\n").replace("edit line 30\n", "head thirty\n"),
+    );
+    t.write("moved.txt", lines("moved").replace("moved line 20\n", "head twenty\n"));
+    t.write("gone.txt", lines("gone").replace("gone line 1\n", "head one\n"));
+    t.write("bin.dat", b"\x00head");
+    t.write("both.txt", "head adds\n");
+    t.write("clean.txt", "only head\n");
+    t.commit("head");
+    t.git(&["checkout", "-q", "main"]);
+    t.write("edit.txt", lines("edit").replace("edit line 5\n", "onto five\n").replace("edit line 35\n", "onto 35\n"));
+    t.git(&["mv", "moved.txt", "renamed.txt"]);
+    t.rm("gone.txt");
+    t.write("bin.dat", b"\x00onto");
+    t.write("both.txt", "onto adds\n");
+    t.write("same.txt", lines("same").replace("same line 0\n", "onto zero\n"));
+    t.commit("onto");
+    let repo = t.open().await;
+    let base = t.git(&["rev-parse", "main~1"]);
+    for (onto, head) in [("main", "head"), ("head", "main")] {
+        let ours = repo.replay(&base, onto, head).await.unwrap();
+        assert_eq!(ours, git_merge_tree(&t, &base, onto, head), "{onto} <- {head}");
+        assert_eq!(ours.1, ["bin.dat", "both.txt", "edit.txt", "gone.txt"]);
+    }
+    let clean = repo.replay(&base, "main~1", "head").await.unwrap();
+    assert_eq!(clean, git_merge_tree(&t, &base, "main~1", "head"));
+    assert!(clean.1.is_empty());
+}

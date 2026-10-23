@@ -16,7 +16,7 @@ pub use grep::{GrepMatch, GrepOptions, GrepResult};
 pub use refs::{Remote, Upstream};
 
 use crate::error::{GitError, Result};
-use exec::{ExecOptions, exec_git, text};
+use exec::{ExecOptions, exec_git};
 
 /// Objects a thread-local handle keeps decoded, so walks and repeated lookups skip re-inflating.
 const OBJECT_CACHE: usize = 16 * 1024 * 1024;
@@ -88,10 +88,6 @@ impl GitRepo {
 
     async fn exec(&self, args: &[&str], opts: ExecOptions<'_>) -> Result<Vec<u8>, GitError> {
         exec_git(&self.root, args, opts).await
-    }
-
-    async fn text_with(&self, args: &[&str], opts: ExecOptions<'_>) -> Result<String, GitError> {
-        Ok(text(self.exec(args, opts).await?))
     }
 }
 

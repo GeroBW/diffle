@@ -2,10 +2,13 @@
 use gix::bstr::ByteSlice;
 use gix::objs::Kind;
 
-use super::exec::ExecOptions;
 use super::{GitRepo, refs};
 use crate::error::{GitError, Result};
 use crate::protocol::{CommitInfo, LastCommitsPreview};
+use gix::ObjectId;
+use gix::merge::blob::builtin_driver::text::Labels;
+use gix::merge::tree::TreatAsUnresolved;
+use gix::merge::tree::apply_index_entries::RemovalMode;
 
 impl GitRepo {
     /// Commit sha for a user-supplied revision; a revision that names no commit is missing.
@@ -85,17 +88,32 @@ impl GitRepo {
         .await
     }
 
-    /// Replays what `head` changed since `base` onto `onto`, in memory: the resulting tree, and the
-    /// paths the merge could not settle, which the tree holds with conflict markers. Needs git 2.38.
+    /// Replays what `head` changed since `base` onto `onto`, as `git merge-tree` would: the
+    /// resulting tree, written to the object database, and the paths the merge could not settle,
+    /// which the tree holds with conflict markers labelled with `onto` and `head`.
     pub async fn replay(&self, base: &str, onto: &str, head: &str) -> Result<(String, Vec<String>), GitError> {
-        let merge_base = format!("--merge-base={base}");
-        let args = ["merge-tree", "--write-tree", "-z", "--name-only", &merge_base, "--end-of-options", onto, head];
-        let out = self.text_with(&args, ExecOptions { ok_codes: &[1], ..Default::default() }).await?;
-        // With -z, the tree, each conflicted path and the sections end in NUL.
-        let mut parts = out.split('\0');
-        let tree = parts.next().unwrap_or_default().to_owned();
-        let conflicts = parts.take_while(|p| !p.is_empty()).map(str::to_owned).collect();
-        Ok((tree, conflicts))
+        let (base, onto, head) = (base.to_owned(), onto.to_owned(), head.to_owned());
+        self.gix("merge-tree", move |repo| {
+            let tree = |rev: &str| -> anyhow::Result<ObjectId> {
+                Ok(repo.rev_parse_single(rev)?.object()?.peel_to_tree()?.id)
+            };
+            let labels = Labels {
+                ancestor: Some(base.as_str().into()),
+                current: Some(onto.as_str().into()),
+                other: Some(head.as_str().into()),
+            };
+            let mut merged =
+                repo.merge_trees(tree(&base)?, tree(&onto)?, tree(&head)?, labels, repo.tree_merge_options()?)?;
+            let id = merged.tree.write()?.detach();
+            // The conflicted paths are those the merge leaves at a stage, as git's index would hold them.
+            let mut index = repo.index_from_tree(&id)?;
+            merged.index_changed_after_applying_conflicts(&mut index, TreatAsUnresolved::git(), RemovalMode::Prune);
+            let mut conflicts: Vec<String> =
+                index.entries().iter().filter(|e| e.stage_raw() != 0).map(|e| e.path(&index).to_string()).collect();
+            conflicts.dedup();
+            Ok((id.to_string(), conflicts))
+        })
+        .await
     }
 
     /// Points refs at objects so they survive `gc` and a force-push, or with none deletes them.

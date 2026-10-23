@@ -28,6 +28,7 @@ gix = { version = "0.89", default-features = false, features = [
   "index",
   "dirwalk",
   "blob-diff",
+  "merge",
 ] }
 hex = "0.4"
 indexmap = "2"
