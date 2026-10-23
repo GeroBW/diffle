@@ -298,3 +298,91 @@ async fn replays_as_git_merge_tree_does_conflicts_included() {
     assert_eq!(clean, git_merge_tree(&t, &base, "main~1", "head"));
     assert!(clean.1.is_empty());
 }
+
+/// `git grep -n -I -z` matches as `(path, line, text)`, every one of them.
+fn git_grep(dir: &std::path::Path, query: &str, rev: &str, flags: &[&str]) -> Vec<(String, i64, String)> {
+    let mut args = vec!["grep", "-n", "--no-column", "-I", "-z"];
+    args.extend(flags);
+    args.extend(["-e", query, if rev == "worktree" { "--untracked" } else { rev }, "--"]);
+    let out = Command::new("git").args(&args).current_dir(dir).output().unwrap();
+    String::from_utf8_lossy(&out.stdout)
+        .split_terminator('\n')
+        .map(|record| {
+            let mut f = record.splitn(3, '\0');
+            let path = f.next().unwrap();
+            let path = if rev == "worktree" { path } else { path.split_once(':').unwrap().1 };
+            (path.to_owned(), f.next().unwrap().parse().unwrap(), f.next().unwrap().chars().take(300).collect())
+        })
+        .collect()
+}
+
+async fn assert_grep(dir: &std::path::Path, repo: &diffle::git::GitRepo, query: &str, rev: &str, flags: &[&str]) {
+    let opts = diffle::git::GrepOptions {
+        word: flags.contains(&"-w"),
+        ignore_case: flags.contains(&"-i"),
+        regex: flags.contains(&"-E"),
+        ..Default::default()
+    };
+    let result = repo.grep(query, rev, 100_000, opts).await.unwrap();
+    let ours: Vec<_> = result.matches.into_iter().map(|m| (m.path, m.line, m.text)).collect();
+    let mut git_flags = flags.to_vec();
+    if !flags.contains(&"-E") {
+        git_flags.push("-F");
+    }
+    let mut theirs = git_grep(dir, query, rev, &git_flags);
+    // A capped search is git's first matches, flagged as cut.
+    assert_eq!(result.truncated, theirs.len() > ours.len(), "{query} {flags:?} in {rev}: truncation");
+    theirs.truncate(ours.len());
+    if ours != theirs {
+        let at = ours.iter().zip(&theirs).position(|(a, b)| a != b).unwrap_or(ours.len().min(theirs.len()));
+        panic!(
+            "{query} {flags:?} in {rev}: {} vs {} matches, first difference at {at}:\nours {:?}\ngit  {:?}",
+            ours.len(),
+            theirs.len(),
+            ours.get(at),
+            theirs.get(at)
+        );
+    }
+}
+
+#[tokio::test]
+async fn searches_as_git_grep_does() {
+    let t = TestRepo::new();
+    t.write("a.txt", "one two\nfoo_bar foo\r\n-x x- -x-\nTwo\n");
+    t.write("dir/b.rs", "fn foo() {}\nlet foo2 = foo;\n");
+    t.write("bin.dat", b"foo\x00");
+    t.write(".gitattributes", "*.lock -diff\n");
+    t.write("deps.lock", "foo\n");
+    t.commit("base");
+    t.write("a.txt", "one two\nfoo changed\n");
+    t.write("new.txt", "untracked foo\n");
+    let repo = t.open().await;
+    for rev in ["HEAD", "worktree"] {
+        for (query, flags) in [
+            ("foo", &[][..]),
+            ("foo", &["-w"]),
+            ("-x", &["-w"]),
+            ("two", &["-i"]),
+            ("fo+(_bar)?", &["-E"]),
+            ("^let|\\}$", &["-E", "-w"]),
+            ("o", &[]),
+        ] {
+            assert_grep(&t.path, &repo, query, rev, flags).await;
+        }
+    }
+}
+
+/// `DIFFLE_PARITY_REPO=<dir> cargo test --test gix_parity -- --ignored grep`.
+#[tokio::test]
+#[ignore]
+async fn searches_a_real_repository_as_git_grep_does() {
+    let dir = std::path::PathBuf::from(std::env::var("DIFFLE_PARITY_REPO").expect("DIFFLE_PARITY_REPO"));
+    let repo = diffle::git::GitRepo::open(&dir).await.unwrap();
+    for rev in ["HEAD", "worktree"] {
+        for (query, flags) in
+            [("fn", &["-w"][..]), ("self", &["-i"]), ("[A-Z][a-z]+Error", &["-E"]), ("TODO", &[]), ("::", &["-w"])]
+        {
+            assert_grep(&dir, &repo, query, rev, flags).await;
+        }
+    }
+}

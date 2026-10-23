@@ -132,13 +132,13 @@ fn detect_renames(changes: &mut Vec<Change>, reader: &mut Reader<'_>) {
 }
 
 /// Paths whose `diff` attribute is unset (`-diff`, `binary`): git diffs them as binary unread.
-struct NoDiff<'repo> {
+pub(in crate::git) struct NoDiff<'repo> {
     stack: gix::AttributeStack<'repo>,
     outcome: gix::attrs::search::Outcome,
 }
 
 impl<'repo> NoDiff<'repo> {
-    fn new(repo: &'repo gix::Repository) -> anyhow::Result<Self> {
+    pub(in crate::git) fn new(repo: &'repo gix::Repository) -> anyhow::Result<Self> {
         let index = repo.index_or_empty()?;
         let stack =
             repo.attributes_only(&index, gix::worktree::stack::state::attributes::Source::WorktreeThenIdMapping)?;
@@ -146,7 +146,7 @@ impl<'repo> NoDiff<'repo> {
         Ok(Self { stack, outcome })
     }
 
-    fn get(&mut self, path: &BString) -> anyhow::Result<bool> {
+    pub(in crate::git) fn get(&mut self, path: &BString) -> anyhow::Result<bool> {
         self.outcome.reset();
         self.stack.at_entry(path.as_bstr(), None)?.matching_attributes(&mut self.outcome);
         Ok(self.outcome.iter_selected().next().is_some_and(|m| m.assignment.state == gix::attrs::StateRef::Unset))
