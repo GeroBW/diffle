@@ -30,7 +30,7 @@ Or grab the standalone binary. On Linux (x64, arm64, glibc) and Apple silicon ma
 curl -fsSL https://diffle.app/install.sh | sh
 ```
 
-It installs to `~/.local/bin`. Set `DIFFLE_INSTALL_DIR` to change that, or `DIFFLE_VERSION=v0.1.9`
+It installs to `~/.local/bin`. Set `DIFFLE_INSTALL_DIR` to change that, or `DIFFLE_VERSION=v0.4.0`
 to pin a release. On Windows (x64, arm64), from PowerShell:
 
 ```powershell
