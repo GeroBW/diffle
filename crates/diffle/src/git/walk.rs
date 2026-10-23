@@ -22,17 +22,7 @@ impl GitRepo {
     pub async fn range_commits(&self, range: &str, limit: usize) -> Result<RangeList, GitError> {
         let range = range.to_owned();
         self.gix("listing commits", move |repo| {
-            let commit = |id: ObjectId| -> anyhow::Result<ObjectId> { Ok(repo.find_object(id)?.peel_to_commit()?.id) };
-            let (tips, hidden) = match repo.rev_parse(range.as_str())?.detach() {
-                Spec::Include(id) => (vec![commit(id)?], Vec::new()),
-                Spec::Range { from, to } => (vec![commit(to)?], vec![commit(from)?]),
-                Spec::ExcludeParents(id) => {
-                    let tip = repo.find_commit(commit(id)?)?;
-                    (vec![tip.id], tip.parent_ids().map(gix::Id::detach).collect())
-                }
-                _ => anyhow::bail!("unsupported range {range}"),
-            };
-            let order = date_order(repo, &tips, hidden)?;
+            let order = commits_in(repo, &range)?;
             let total = order.len() as i64;
             let list = order
                 .into_iter()
@@ -84,6 +74,21 @@ impl GitRepo {
         })
         .await
     }
+}
+
+/// The commits a range such as `a..b`, `c^!` or `d` selects, newest first as `git log` lists them.
+pub(super) fn commits_in(repo: &gix::Repository, range: &str) -> anyhow::Result<Vec<ObjectId>> {
+    let commit = |id: ObjectId| -> anyhow::Result<ObjectId> { Ok(repo.find_object(id)?.peel_to_commit()?.id) };
+    let (tips, hidden) = match repo.rev_parse(range)?.detach() {
+        Spec::Include(id) => (vec![commit(id)?], Vec::new()),
+        Spec::Range { from, to } => (vec![commit(to)?], vec![commit(from)?]),
+        Spec::ExcludeParents(id) => {
+            let tip = repo.find_commit(commit(id)?)?;
+            (vec![tip.id], tip.parent_ids().map(gix::Id::detach).collect())
+        }
+        _ => anyhow::bail!("unsupported range {range}"),
+    };
+    date_order(repo, &tips, hidden)
 }
 
 /// The commits reachable from `tips` but not from `hidden`, newest first as `git log` lists them:

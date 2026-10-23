@@ -90,10 +90,6 @@ impl GitRepo {
         exec_git(&self.root, args, opts).await
     }
 
-    async fn text(&self, args: &[&str]) -> Result<String, GitError> {
-        Ok(text(self.exec(args, ExecOptions::default()).await?))
-    }
-
     async fn text_with(&self, args: &[&str], opts: ExecOptions<'_>) -> Result<String, GitError> {
         Ok(text(self.exec(args, opts).await?))
     }

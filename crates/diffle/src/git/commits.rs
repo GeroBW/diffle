@@ -1,33 +1,11 @@
-//! Revisions, commit metadata, and the plumbing range-diffs are built from.
-use std::collections::HashMap;
-use std::sync::LazyLock;
-
+//! Revisions, commit metadata, merge bases, and the refs that pin iterations.
 use gix::bstr::ByteSlice;
 use gix::objs::Kind;
-use regex::Regex;
 
 use super::exec::ExecOptions;
 use super::{GitRepo, refs};
 use crate::error::{GitError, Result};
 use crate::protocol::{CommitInfo, LastCommitsPreview};
-
-/// `git range-diff` pairs two commits while the diff between their patches costs less than this
-/// percentage of a patch's size. Git's default of 60 leaves a reworded three-line commit unpaired,
-/// since the message change alone outweighs it; at 100 the message may change as much as the patch.
-const CREATION_FACTOR: &str = "--creation-factor=100";
-
-/// Numbers are right-aligned, so rows of a range with ten or more commits start with spaces.
-static RANGE_DIFF_ROW: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*(?:\d+:\s+([0-9a-f]+)|-:\s+-+)\s+([=!<>])\s+(?:\d+:\s+([0-9a-f]+)|-:\s+-+)\s").unwrap()
-});
-
-/// One row of `git range-diff -s`: abbreviated hashes, none on the side a commit has no counterpart.
-pub struct RangeDiffRow {
-    pub old: Option<String>,
-    pub new: Option<String>,
-    /// `=` identical, `!` changed, `<` only in the first range, `>` only in the second.
-    pub marker: char,
-}
 
 impl GitRepo {
     /// Commit sha for a user-supplied revision; a revision that names no commit is missing.
@@ -118,39 +96,6 @@ impl GitRepo {
         let tree = parts.next().unwrap_or_default().to_owned();
         let conflicts = parts.take_while(|p| !p.is_empty()).map(str::to_owned).collect();
         Ok((tree, conflicts))
-    }
-
-    /// How `git range-diff` pairs the commits of two ranges, in its output order. Summary only, no
-    /// patches. Ranges are given as hashes: range-diff learnt `--end-of-options` only in git 2.44.
-    pub async fn range_diff(&self, old_range: &str, new_range: &str) -> Result<Vec<RangeDiffRow>, GitError> {
-        let out = self.text(&["range-diff", "-s", "--no-color", CREATION_FACTOR, old_range, new_range]).await?;
-        Ok(out
-            .lines()
-            .filter_map(|line| RANGE_DIFF_ROW.captures(line))
-            .map(|m| RangeDiffRow {
-                old: m.get(1).map(|s| s.as_str().to_owned()),
-                new: m.get(3).map(|s| s.as_str().to_owned()),
-                marker: m[2].chars().next().unwrap_or('!'),
-            })
-            .collect())
-    }
-
-    /// Each commit's stable patch id, so two commits with the same change under different messages compare equal.
-    pub async fn patch_ids(&self, shas: &[String]) -> Result<HashMap<String, String>, GitError> {
-        let mut ids = HashMap::new();
-        if shas.is_empty() {
-            return Ok(ids);
-        }
-        let mut args = vec!["log", "-p", "--no-walk", "--no-show-signature", "--format=%H", "--end-of-options"];
-        args.extend(shas.iter().map(String::as_str));
-        let patches = self.exec(&args, ExecOptions::default()).await?;
-        let opts = ExecOptions { input: Some(&patches), ..Default::default() };
-        for line in self.text_with(&["patch-id", "--stable"], opts).await?.lines() {
-            if let Some((id, sha)) = line.split_once(' ') {
-                ids.insert(sha.to_owned(), id.to_owned());
-            }
-        }
-        Ok(ids)
     }
 
     /// Points refs at objects so they survive `gc` and a force-push, or with none deletes them.

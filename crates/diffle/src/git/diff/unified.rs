@@ -1,31 +1,16 @@
 //! Patches in `git diff`'s format: its headers, path quoting, hunk grouping and the `@@` function
 //! context line, so what the viewer parses and shows is what git would print.
 use gix::ObjectId;
-use gix::diff::blob::{Algorithm, Diff, InternedInput};
 
+use super::hunks;
 use super::rename::MAX_SCORE;
 use super::sides::{GITLINK, kind};
 
 /// Git's `FIRST_FEW_BYTES`: a NUL this early makes a file binary.
 const SNIFF: usize = 8000;
-/// Git keeps this much of a hunk's function line.
-const FUNC_LINE: usize = 80;
 
 pub fn is_binary(buf: &[u8]) -> bool {
     buf[..buf.len().min(SNIFF)].contains(&0)
-}
-
-/// The line diff git shows: Myers with its slider and indent heuristics.
-fn line_diff<'a>(old: &'a [u8], new: &'a [u8]) -> (InternedInput<&'a [u8]>, Diff) {
-    let input = InternedInput::new(old, new);
-    let diff = gix::diff::blob::diff_with_slider_heuristics(Algorithm::Myers, &input);
-    (input, diff)
-}
-
-/// Lines added and removed, as `--numstat` counts them.
-pub fn line_counts(old: &[u8], new: &[u8]) -> (i64, i64) {
-    let (_, diff) = line_diff(old, new);
-    (i64::from(diff.count_additions()), i64::from(diff.count_removals()))
 }
 
 /// One side of a file pair as the header needs it.
@@ -100,7 +85,7 @@ pub fn write(
         }
         Body::Binary => {}
         Body::Text(before, after) => {
-            let hunks = hunks(before, after, context);
+            let hunks = hunks::hunks(before, after, context, true);
             if hunks.is_empty() {
                 return;
             }
@@ -113,7 +98,17 @@ pub fn write(
             out.extend_from_slice(&new_label);
             out.extend_from_slice(tab(new));
             out.push(b'\n');
-            out.extend_from_slice(&hunks);
+            for hunk in &hunks {
+                out.extend_from_slice(hunk.header.as_bytes());
+                if !hunk.func.is_empty() {
+                    out.push(b' ');
+                    out.extend_from_slice(&hunk.func);
+                }
+                out.push(b'\n');
+                for &(prefix, line) in &hunk.lines {
+                    emit(out, prefix, line);
+                }
+            }
         }
     }
 }
@@ -123,118 +118,12 @@ pub fn splits(old: u32, new: u32) -> bool {
     kind(old) != kind(new) && !(kind(old) == GITLINK && kind(new) == GITLINK)
 }
 
-/// The hunks of a text diff with `context` lines around each change; changes at most twice the
-/// context apart share a hunk.
-fn hunks(old: &[u8], new: &[u8], context: u32) -> Vec<u8> {
-    let (input, diff) = line_diff(old, new);
-    let (before, after) = (&input.before, &input.after);
-    let line = |token| input.interner[token];
-    let changes: Vec<_> = diff.hunks().collect();
-    let mut out = Vec::new();
-    let mut func = FuncLine::default();
-    let mut i = 0;
-    while i < changes.len() {
-        let mut j = i;
-        while j + 1 < changes.len() && changes[j + 1].before.start - changes[j].before.end <= 2 * context {
-            j += 1;
-        }
-        let (first, last) = (&changes[i], &changes[j]);
-        let s1 = first.before.start.saturating_sub(context);
-        let s2 = first.after.start.saturating_sub(context);
-        let e1 = (last.before.end + context).min(before.len() as u32);
-        let e2 = (last.after.end + context).min(after.len() as u32);
-        let header = |start: u32, count: u32| {
-            let start = if count == 0 { start } else { start + 1 };
-            if count == 1 { format!("{start}") } else { format!("{start},{count}") }
-        };
-        out.extend_from_slice(format!("@@ -{} +{} @@", header(s1, e1 - s1), header(s2, e2 - s2)).as_bytes());
-        let text = func.find(|l| line(before[l as usize]), i64::from(s1) - 1);
-        if !text.is_empty() {
-            out.push(b' ');
-            out.extend_from_slice(text);
-        }
-        out.push(b'\n');
-        let (mut o, mut n) = (s1, s2);
-        for change in &changes[i..=j] {
-            while o < change.before.start {
-                emit(&mut out, b' ', line(before[o as usize]));
-                (o, n) = (o + 1, n + 1);
-            }
-            for k in change.before.clone() {
-                emit(&mut out, b'-', line(before[k as usize]));
-            }
-            for k in change.after.clone() {
-                emit(&mut out, b'+', line(after[k as usize]));
-            }
-            (o, n) = (change.before.end, change.after.end);
-        }
-        while o < e1 {
-            emit(&mut out, b' ', line(before[o as usize]));
-            (o, n) = (o + 1, n + 1);
-        }
-        let _ = n;
-        i = j + 1;
-    }
-    out
-}
-
 fn emit(out: &mut Vec<u8>, prefix: u8, line: &[u8]) {
     out.push(prefix);
     out.extend_from_slice(line);
     if line.last() != Some(&b'\n') {
         out.extend_from_slice(b"\n\\ No newline at end of file\n");
     }
-}
-
-/// The `@@` header's function line: the nearest old-side line above the hunk that starts with a
-/// letter, `_` or `$`, searched back only to the previous hunk's start and otherwise carried over.
-#[derive(Default)]
-struct FuncLine {
-    text: Vec<u8>,
-    searched_to: Option<i64>,
-}
-
-impl FuncLine {
-    fn find<'a>(&'a mut self, line: impl Fn(u32) -> &'a [u8], start: i64) -> &'a [u8] {
-        let limit = self.searched_to.unwrap_or(-1);
-        self.searched_to = Some(start);
-        let mut l = start;
-        while l > limit && l >= 0 {
-            let rec = line(l as u32);
-            if rec.first().is_some_and(|&c| c.is_ascii_alphabetic() || c == b'_' || c == b'$') {
-                let mut len = rec.len().min(FUNC_LINE);
-                while len > 0 && is_space(rec[len - 1]) {
-                    len -= 1;
-                }
-                // Whitespace goes first: a space before the split character stays.
-                if len < rec.len() {
-                    len = whole_chars(&rec[..len]);
-                }
-                self.text = rec[..len].to_vec();
-                break;
-            }
-            l -= 1;
-        }
-        &self.text
-    }
-}
-
-/// How much of `cut` ends on a whole UTF-8 character: git drops a sequence the cut split.
-fn whole_chars(cut: &[u8]) -> usize {
-    let start = cut.len().saturating_sub(4);
-    let Some(lead) = (start..cut.len()).rev().find(|&i| cut[i] & 0xc0 != 0x80) else { return cut.len() };
-    let width = match cut[lead] {
-        b if b >= 0xf0 => 4,
-        b if b >= 0xe0 => 3,
-        b if b >= 0xc0 => 2,
-        _ => 1,
-    };
-    if lead + width > cut.len() { lead } else { cut.len() }
-}
-
-/// C's `isspace`, which git trims the function line with.
-fn is_space(c: u8) -> bool {
-    matches!(c, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)
 }
 
 /// `prefix` and `path` as git prints them together: in quotes, escaped, when the path needs it.

@@ -1,7 +1,11 @@
 //! What changed between two sides and the patches showing it, computed in-process the way `git
 //! diff -M` does: the same files, renames, line counts and patch text.
+mod assignment;
+mod hunks;
 mod patch;
+mod patch_id;
 mod rename;
+mod series;
 pub mod sides;
 mod unified;
 
@@ -168,7 +172,7 @@ fn changed_file(change: &Change, reader: &mut Reader<'_>, no_diff: &mut NoDiff<'
     };
     let (before, after) = (read(reader, old), read(reader, new));
     let (binary, (additions, deletions)) = match (&before, &after) {
-        (Some(b), Some(a)) if !is_binary(b) && !is_binary(a) => (false, unified::line_counts(b, a)),
+        (Some(b), Some(a)) if !is_binary(b) && !is_binary(a) => (false, hunks::line_counts(b, a)),
         _ => (true, (0, 0)),
     };
     let gitlink = [old, new].into_iter().flatten().any(|i| kind(i.mode) == GITLINK);

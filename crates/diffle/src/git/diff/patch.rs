@@ -102,9 +102,6 @@ fn write_patch(
     file: &ChangedFile,
     context: u32,
 ) {
-    let abbrev = abbrev(repo);
-    let side = |item| side(repo, item, abbrev);
-    let (old_side, new_side) = (old.as_ref().map(side), new.as_ref().map(side));
     let read = |reader: &mut Reader<'_>, item: Option<&Item>| match item {
         Some(item) if !file.binary => reader.content(item),
         Some(_) => None,
@@ -119,21 +116,36 @@ fn write_patch(
         }
         _ => 0,
     });
-    let (empty_before, empty_after) = (Some(Vec::new()), Some(Vec::new()));
-    match (&old_side, &new_side) {
-        (Some(o), Some(n)) if unified::splits(o.mode, n.mode) => {
-            unified::write(out, (Some(o), None), None, body(&before, &empty_after), context, abbrev);
-            unified::write(out, (None, Some(n)), None, body(&empty_before, &after), context, abbrev);
-        }
-        _ => {
-            let sides = (old_side.as_ref(), new_side.as_ref());
-            unified::write(out, sides, rename, body(&before, &after), context, abbrev);
-        }
-    }
+    write_pair(out, repo, (old.as_ref(), new.as_ref()), rename, (&before, &after), context);
 }
 
 fn side<'a>(repo: &gix::Repository, item: &'a Item, abbrev: usize) -> Side<'a> {
     Side { path: &item.path, mode: item.mode, id: item.id, short: short(repo, item.id, abbrev) }
+}
+
+/// Appends one pair's patch from its contents, none where binary.
+pub(super) fn write_pair(
+    out: &mut Vec<u8>,
+    repo: &gix::Repository,
+    (old, new): (Option<&Item>, Option<&Item>),
+    rename: Option<u64>,
+    (before, after): (&Option<Vec<u8>>, &Option<Vec<u8>>),
+    context: u32,
+) {
+    let abbrev = abbrev(repo);
+    let side = |item| side(repo, item, abbrev);
+    let (old_side, new_side) = (old.map(side), new.map(side));
+    let (empty_before, empty_after) = (Some(Vec::new()), Some(Vec::new()));
+    match (&old_side, &new_side) {
+        (Some(o), Some(n)) if unified::splits(o.mode, n.mode) => {
+            unified::write(out, (Some(o), None), None, body(before, &empty_after), context, abbrev);
+            unified::write(out, (None, Some(n)), None, body(&empty_before, after), context, abbrev);
+        }
+        _ => {
+            let sides = (old_side.as_ref(), new_side.as_ref());
+            unified::write(out, sides, rename, body(before, after), context, abbrev);
+        }
+    }
 }
 
 /// Text to diff when both sides read as text, else binary.
